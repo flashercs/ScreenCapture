@@ -35,7 +35,7 @@ namespace ScreenCapture
 
         public bool IsSelectedButton
         {
-            get { return this.IsSelectedButton; }
+            get { return this._IsSelectedButton; }
             set
             {
                 this._IsSelectedButton = value;
