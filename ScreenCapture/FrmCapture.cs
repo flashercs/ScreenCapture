@@ -1,13 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
 using System.Drawing;
-using System.Text;
+using System.Linq;
 using System.Windows.Forms;
-
-using System.Threading;
-using System.Diagnostics;
+using static ScreenCapture.Win32;
 
 namespace ScreenCapture
 {
@@ -15,11 +12,13 @@ namespace ScreenCapture
     {
         public event Action<Bitmap> CaptureFinished;
 
+        #region 构造函数
+
         public FrmCapture()
         {
             InitializeComponent();
 
-            this.SetStyle(ControlStyles.OptimizedDoubleBuffer
+            SetStyle(ControlStyles.OptimizedDoubleBuffer
                        | ControlStyles.ResizeRedraw
                        | ControlStyles.Selectable
                        | ControlStyles.AllPaintingInWmPaint
@@ -27,31 +26,33 @@ namespace ScreenCapture
                        | ControlStyles.SupportsTransparentBackColor,
                      true);
 
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.Location = new Point(0, 0);
-            this.Size = new Size(Screen.PrimaryScreen.Bounds.Width, Screen.PrimaryScreen.Bounds.Height);
-            this.TopMost = true;
-            this.ShowInTaskbar = false;
+            // 如果1号屏幕在右边，那就不行了
+            FormBorderStyle = FormBorderStyle.None;
+            Location = new Point(0, 0);
+            //Screen.PrimaryScreen.Bounds.Height
+            Size = new Size(ScreenWidth, ScreenHeight);
+            TopMost = true;
+            ShowInTaskbar = false;
 
             m_MHook = new MouseHook();
             this.FormClosing += (s, e) =>
             {
                 this.timer1.Dispose();
                 m_MHook.UnLoadHook();
-                this.DelResource();
+                this.DeleteResource();
             };
-            this.panel1.Paint += new PaintEventHandler(panel1_Paint);
-            this.panel2.Paint += new PaintEventHandler(panel1_Paint);
+            this.panel1.Paint += panel1_Paint;
+            this.panel2.Paint += panel1_Paint;
             imageProcessBox1.MouseLeave += (s, e) => this.Cursor = Cursors.Default;
             //后期一些操作历史记录图层
             m_layer = new List<Bitmap>();
         }
 
-        void panel1_Paint(object sender, PaintEventArgs e)
+        private static void panel1_Paint(object sender, PaintEventArgs e)
         {
-            Panel pel = (Panel)sender;
+            var pel = (Panel)sender;
             pel.BackColor = Color.FromArgb(222, 238, 254);
-            Color bdColor = Color.FromArgb(71, 150, 207);
+            var bdColor = Color.FromArgb(71, 150, 207);
             ControlPaint.DrawBorder(e.Graphics, pel.ClientRectangle,
                 bdColor, 1, ButtonBorderStyle.Solid,
                 bdColor, 1, ButtonBorderStyle.Solid,
@@ -59,81 +60,102 @@ namespace ScreenCapture
                 bdColor, 1, ButtonBorderStyle.Solid);
         }
 
-        private void DelResource()
+        private void DeleteResource()
         {
-            if (m_bmpLayerCurrent != null)
-                m_bmpLayerCurrent.Dispose();
-            if (m_bmpLayerShow != null)
-                m_bmpLayerShow.Dispose();
+            m_bmpLayerCurrent?.Dispose();
+            m_bmpLayerShow?.Dispose();
             m_layer.Clear();
-            imageProcessBox1.DeleResource();
+            imageProcessBox1.DeleteResource();
             GC.Collect();
         }
 
+        #endregion
+
         #region Properties
 
-        private bool isCaptureCursor;
+        public static int ScreenWidth => Screen.AllScreens.Sum(screen => screen.Bounds.Width);
+
+        public static int ScreenHeight => Screen.AllScreens.Sum(screen => screen.Bounds.Height);
+
         /// <summary>
         /// 获取或设置是否捕获鼠标
         /// </summary>
-        public bool IsCaptureCursor
-        {
-            get { return isCaptureCursor; }
-            set { isCaptureCursor = value; }
-        }
-        private bool isFromClipBoard;
+        public bool IsCaptureCursor { get; set; }
+
         /// <summary>
         /// 获取或设置是否从剪切板获取图像
         /// </summary>
-        public bool IsFromClipBoard
-        {
-            get { return isFromClipBoard; }
-            set { isFromClipBoard = value; }
-        }
+        public bool IsFromClipBoard { get; set; }
+
         /// <summary>
         /// 获取或设置是否显示图像信息
         /// </summary>
         public bool ImgProcessBoxIsShowInfo
         {
-            get { return imageProcessBox1.IsShowInfo; }
-            set { imageProcessBox1.IsShowInfo = value; }
+            get => imageProcessBox1.IsShowInfo;
+            set => imageProcessBox1.IsShowInfo = value;
         }
         /// <summary>
         /// 获取或设置操作框点的颜色
         /// </summary>
         public Color ImgProcessBoxDotColor
         {
-            get { return imageProcessBox1.DotColor; }
-            set { imageProcessBox1.DotColor = value; }
+            get => imageProcessBox1.DotColor;
+            set => imageProcessBox1.DotColor = value;
         }
         /// <summary>
         /// 获取或设置操作框边框颜色
         /// </summary>
         public Color ImgProcessBoxLineColor
         {
-            get { return imageProcessBox1.LineColor; }
-            set { imageProcessBox1.LineColor = value; }
+            get => imageProcessBox1.LineColor;
+            set => imageProcessBox1.LineColor = value;
         }
+
         /// <summary>
         /// 获取或设置放大图形的原始尺寸
         /// </summary>
         public Size ImgProcessBoxMagnifySize
         {
-            get { return imageProcessBox1.MagnifySize; }
-            set { imageProcessBox1.MagnifySize = value; }
+            get => imageProcessBox1.MagnifySize;
+            set => imageProcessBox1.MagnifySize = value;
         }
+
         /// <summary>
         /// 获取或设置放大图像的倍数
         /// </summary>
         public int ImgProcessBoxMagnifyTimes
         {
-            get { return imageProcessBox1.MagnifyTimes; }
-            set { imageProcessBox1.MagnifyTimes = value; }
+            get => imageProcessBox1.MagnifyTimes;
+            set => imageProcessBox1.MagnifyTimes = value;
         }
 
         #endregion
 
-        //初始化参数
+        private readonly MouseHook m_MHook;
+        private readonly List<Bitmap> m_layer;       //记录历史图层
+
+        private bool m_isStartDraw;
+        private Point m_ptOriginal;
+        private Point m_ptCurrent;
+        private Bitmap m_bmpLayerCurrent;
+        private Bitmap m_bmpLayerShow;
+
+        private void FrmCapture_Load(object sender, EventArgs e)
+        {
+            this.InitMember();
+            imageProcessBox1.BaseImage = GetScreen(IsCaptureCursor, IsFromClipBoard);
+            m_MHook.SetHook();
+            m_MHook.MHookEvent += m_MHook_MHookEvent;
+            imageProcessBox1.IsDrawOperationDot = false;
+            this.BeginInvoke(new MethodInvoker(() => Enabled = false));
+            timer1.Interval = 10;
+            timer1.Enabled = true;
+        }
+
+        /// <summary>
+        /// 初始化参数
+        /// </summary>
         private void InitMember()
         {
             panel1.Visible = false;
@@ -146,12 +168,12 @@ namespace ScreenCapture
             panel1.Paint += (s, e) => e.Graphics.DrawRectangle(Pens.SteelBlue, 0, 0, panel1.Width - 1, panel1.Height - 1);
             panel2.Paint += (s, e) => e.Graphics.DrawRectangle(Pens.SteelBlue, 0, 0, panel2.Width - 1, panel2.Height - 1);
 
-            tBtn_Rect.Click += new EventHandler(selectToolButton_Click);
-            tBtn_Ellipse.Click += new EventHandler(selectToolButton_Click);
-            tBtn_Arrow.Click += new EventHandler(selectToolButton_Click);
-            tBtn_Brush.Click += new EventHandler(selectToolButton_Click);
-            tBtn_Text.Click += new EventHandler(selectToolButton_Click);
-            tBtn_Close.Click += new EventHandler(tBtn_Close_Click);
+            tBtn_Rect.Click += selectToolButton_Click;
+            tBtn_Ellipse.Click += selectToolButton_Click;
+            tBtn_Arrow.Click += selectToolButton_Click;
+            tBtn_Brush.Click += selectToolButton_Click;
+            tBtn_Text.Click += selectToolButton_Click;
+            tBtn_Close.Click += tBtn_Close_Click;
 
             textBox1.BorderStyle = BorderStyle.None;
             textBox1.Visible = false;
@@ -159,96 +181,56 @@ namespace ScreenCapture
             colorBox1.ColorChanged += (s, e) => textBox1.ForeColor = e.Color;
         }
 
-        void tBtn_Close_Click(object sender, EventArgs e)
-        {
-            this.imageProcessBox1.Dispose();
-            this.Close();
-        }
-
-        private MouseHook m_MHook;
-        private List<Bitmap> m_layer;       //记录历史图层
-
-        //private bool m_bSave;
-        private bool m_isStartDraw;
-        private Point m_ptOriginal;
-        private Point m_ptCurrent;
-        private Bitmap m_bmpLayerCurrent;
-        private Bitmap m_bmpLayerShow;
-
-        private void FrmCapture_Load(object sender, EventArgs e)
-        {
-            this.InitMember();
-            imageProcessBox1.BaseImage = FrmCapture.GetScreen(this.isCaptureCursor, this.isFromClipBoard);
-            m_MHook.SetHook();
-            m_MHook.MHookEvent += new MouseHook.MHookEventHandler(m_MHook_MHookEvent);
-            imageProcessBox1.IsDrawOperationDot = false;
-            this.BeginInvoke(new MethodInvoker(() => this.Enabled = false));
-            timer1.Interval = 10;
-            timer1.Enabled = true;
-        }
-
+        /// <summary>
+        /// 鼠标钩子
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void m_MHook_MHookEvent(object sender, MHookEventArgs e)
         {
             //如果窗体禁用 调用控件的方法设置信息显示位置
-            if (!this.Enabled)      //貌似Hook不能精确坐标(Hook最先执行执 执行完后的坐标可能与执行时传入的坐标发生了变化 猜测是这样) 所以放置了一个timer检测
+            //貌似Hook不能精确坐标(Hook最先执行执 执行完后的坐标可能与执行时传入的坐标发生了变化
+            //猜测是这样) 所以放置了一个timer检测
+            if (!Enabled) 
+            {
                 imageProcessBox1.SetInfoPoint(MousePosition.X, MousePosition.Y);
+            }
+            
             //鼠标点下恢复窗体禁用
             if (e.MButton == ButtonStatus.LeftDown || e.MButton == ButtonStatus.RightDown)
             {
-                this.Enabled = true;
+                Enabled = true;
                 imageProcessBox1.IsDrawOperationDot = true;
             }
-
-            #region 在imageProcessBox_MouseUp中完成了
-            //if (e.MButton == ButtonStatus.LeftUp) {
-            //    //if (imageProcessBox1.SelectedRectangle.Width < 5
-            //    //    || imageProcessBox1.SelectedRectangle.Height < 5) {
-            //    //    //如果选取区域不符要求 向控件模拟鼠标抬起 然后禁用窗体
-            //    //    //(Hook事件先于控件事件 禁用控件时模拟一个鼠标抬起)
-            //    //    Win32.SendMessage(imageProcessBox1.Handle, Win32.WM_LBUTTONUP,
-            //    //        IntPtr.Zero, (IntPtr)(MousePosition.Y << 16 | MousePosition.X));
-            //    //    this.Enabled = false;
-            //    //    imageProcessBox1.IsDrawOperationDot = false;
-            //    //} else
-            //    //    this.SetToolBarLocation();  //重置工具条位置
-            //}
-            #endregion
-
+            
             #region 右键抬起
 
             if (e.MButton == ButtonStatus.RightUp)
             {
                 if (!imageProcessBox1.IsDrawed) //没有绘制那么退出(直接this.Close右键将传递到下面)
-                    this.BeginInvoke(new MethodInvoker(() => this.Close()));
-
-                #region 在imageProcessBox_MouseUp中完成了
-                //if (m_bSave) return;    //如果正在保存 不执行下面的代码
-                //有绘制的情况 情况继续禁用窗体
-                //this.Enabled = false;
-                //imageProcessBox1.ClearDraw();
-                //imageProcessBox1.CanReset = true;
-                //imageProcessBox1.IsDrawOperationDot = false;
-                //m_layer.Clear();    //清空历史记录
-                //m_bmpLayerCurrent = null;
-                //m_bmpLayerShow = null;
-                //ClearToolBarBtnSelected();
-                //panel1.Visible = false;
-                //panel2.Visible = false;
-                #endregion
+                {
+                    OnCaptureFinished(null);
+                    BeginInvoke(new MethodInvoker(Close));
+                }
             }
 
             #endregion
 
             #region 找寻窗体
 
-            if (!this.Enabled)
-                this.FoundAndDrawWindowRect();
-
+            if (!Enabled)
+                FoundAndDrawWindowRect();
 
             #endregion
-
         }
-        //工具条前五个按钮绑定的公共事件
+
+        #region 工具条按钮事件
+
+        /// <summary>
+        /// 工具条前五个按钮绑定的公共事件
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void selectToolButton_Click(object sender, EventArgs e)
         {
             panel2.Visible = ((ToolButton)sender).IsSelected;
@@ -256,6 +238,182 @@ namespace ScreenCapture
             else { imageProcessBox1.CanReset = m_layer.Count == 0; }
             this.SetToolBarLocation();
         }
+
+        /// <summary>
+        /// 取消按钮
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tBtn_Close_Click(object sender, EventArgs e)
+        {
+            this.imageProcessBox1.Dispose();
+            OnCaptureFinished(null);
+            this.Close();
+        }
+
+        /// <summary>
+        /// 撤销
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tBtn_Cancel_Click(object sender, EventArgs e)
+        {
+            using (Graphics g = Graphics.FromImage(m_bmpLayerShow))
+            {
+                g.Clear(Color.Transparent);     //清空当前临时显示的图像
+            }
+            if (m_layer.Count > 0)
+            {            //删除最后一层
+                m_layer.RemoveAt(m_layer.Count - 1);
+                if (m_layer.Count > 0)
+                    m_bmpLayerCurrent = m_layer[m_layer.Count - 1].Clone() as Bitmap;
+                else
+                    m_bmpLayerCurrent = imageProcessBox1.GetResultBmp();
+                imageProcessBox1.Invalidate();
+                imageProcessBox1.CanReset = m_layer.Count == 0 && !HaveSelectedToolButton();
+            }
+            else
+            {                            //如果没有历史记录则取消本次截图
+                this.Enabled = false;
+                imageProcessBox1.ClearDraw();
+                imageProcessBox1.IsDrawOperationDot = false;
+                panel1.Visible = false;
+                panel2.Visible = false;
+            }
+        }
+
+        /// <summary>
+        /// 图像保存到文件
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tBtn_Save_Click(object sender, EventArgs e)
+        {
+            //m_bSave = true;
+            var saveDlg = new SaveFileDialog
+            {
+                Filter = "Bitmap(*.bmp)|*.bmp|JPEG(*.jpg)|*.jpg",
+                FilterIndex = 2,
+                FileName = "CAPTURE_" + GetTimeString()
+            };
+            if (saveDlg.ShowDialog() == DialogResult.OK)
+            {
+                switch (saveDlg.FilterIndex)
+                {
+                    case 1:
+                        m_bmpLayerCurrent.Clone(new Rectangle(0, 0, m_bmpLayerCurrent.Width, m_bmpLayerCurrent.Height),
+                            System.Drawing.Imaging.PixelFormat.Format24bppRgb).Save(saveDlg.FileName,
+                            System.Drawing.Imaging.ImageFormat.Bmp);
+                        this.Close();
+                        break;
+                    case 2:
+                        m_bmpLayerCurrent.Save(saveDlg.FileName,
+                            System.Drawing.Imaging.ImageFormat.Jpeg);
+                        this.Close();
+                        break;
+                }
+            }
+            //m_bSave = false;
+        }
+
+        /// <summary>
+        /// 截图完成 触发OnCaptureFinished事件,同时保存到剪切板
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tBtn_Finish_Click(object sender, EventArgs e)
+        {
+            Clipboard.SetImage(m_bmpLayerCurrent);
+            this.OnCaptureFinished(m_bmpLayerCurrent);
+            this.Close();
+        }
+
+        private void imageProcessBox1_DoubleClick(object sender, EventArgs e)
+        {
+            tBtn_Finish_Click(sender, e);
+        }
+
+        #endregion
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            if (!Enabled)
+                imageProcessBox1.SetInfoPoint(MousePosition.X, MousePosition.Y);
+        }
+        
+        //TODO 根据鼠标位置找寻窗体平绘制边框
+        private void FoundAndDrawWindowRect()
+        {
+            var pt = new Win32.LPPOINT
+            {
+                X = MousePosition.X, 
+                Y = MousePosition.Y
+            };
+
+            // 如果第二屏幕在左边，那么第二屏幕的坐标是负数
+            //System.Diagnostics.Debug.WriteLine($"鼠标坐标: {MousePosition.X},{MousePosition.Y}");
+
+            var hWnd = ChildWindowFromPointEx(GetDesktopWindow(), pt, CWP_SKIPINVISIBL | CWP_SKIPDISABLED);
+            if (hWnd == IntPtr.Zero)
+            {
+                //System.Diagnostics.Debug.WriteLine($"hWnd == IntPtr.Zero: {MousePosition.X},{MousePosition.Y}");
+                return;
+            }
+            var hTemp = hWnd;
+            while (true)
+            {
+                Win32.ScreenToClient(hTemp, out pt);
+                hTemp = Win32.ChildWindowFromPointEx(hWnd, pt, Win32.CWP_SKIPINVISIBL);
+                if (hTemp == IntPtr.Zero || hTemp == hWnd)
+                    break;
+                hWnd = hTemp;
+                pt.X = MousePosition.X; pt.Y = MousePosition.Y; //坐标还原为屏幕坐标
+            }
+
+            Win32.GetWindowRect(hWnd, out var rect);
+            imageProcessBox1.SetSelectRect(new Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top));
+        }
+
+        #region 文本框
+
+        //文本改变时重置文本框大小
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+            var se = TextRenderer.MeasureText(textBox1.Text, textBox1.Font);
+            textBox1.Size = se.IsEmpty ? new Size(50, textBox1.Font.Height) : se;
+        }
+
+        //文本框失去焦点时 绘制文本
+        private void textBox1_Validating(object sender, CancelEventArgs e)
+        {
+            textBox1.Visible = false;
+            if (string.IsNullOrEmpty(textBox1.Text.Trim())) { textBox1.Text = ""; return; }
+            using (var g = Graphics.FromImage(m_bmpLayerCurrent))
+            {
+                var sb = new SolidBrush(colorBox1.SelectedColor);
+                g.DrawString(textBox1.Text, textBox1.Font, sb,
+                    textBox1.Left - imageProcessBox1.SelectedRectangle.Left,
+                    textBox1.Top - imageProcessBox1.SelectedRectangle.Top);
+                sb.Dispose();
+                textBox1.Text = "";
+                SetLayer();        //将文本绘制到当前图层并存入历史记录
+                imageProcessBox1.Invalidate();
+            }
+        }
+
+        //窗体大小改变时重置字体 从控件中获取字体大小
+        private void textBox1_Resize(object sender, EventArgs e)
+        {
+            //在三个大小选择的按钮点击中设置字体大小太麻烦 所以Resize中获取设置
+            int se = 10;
+            if (toolButton2.IsSelected) se = 12;
+            if (toolButton3.IsSelected) se = 14;
+            if (this.textBox1.Font.Height == se) return;
+            textBox1.Font = new Font(this.Font.FontFamily, se);
+        }
+
+
+        #endregion
 
         #region 截图后的一些后期绘制
 
@@ -406,6 +564,7 @@ namespace ScreenCapture
             if (e.Location == m_ptOriginal && !tBtn_Brush.IsSelected) return;
             this.SetLayer();        //将绘制的图形绘制到历史图层中
         }
+        
         //绘制后期操作
         private void imageProcessBox1_Paint(object sender, PaintEventArgs e)
         {
@@ -417,167 +576,104 @@ namespace ScreenCapture
         }
 
         #endregion
-
-        //文本改变时重置文本框大小
-        private void textBox1_TextChanged(object sender, EventArgs e)
-        {
-            Size se = TextRenderer.MeasureText(textBox1.Text, textBox1.Font);
-            textBox1.Size = se.IsEmpty ? new Size(50, textBox1.Font.Height) : se;
-        }
-        //文本框失去焦点时 绘制文本
-        private void textBox1_Validating(object sender, CancelEventArgs e)
-        {
-            textBox1.Visible = false;
-            if (string.IsNullOrEmpty(textBox1.Text.Trim())) { textBox1.Text = ""; return; }
-            using (Graphics g = Graphics.FromImage(m_bmpLayerCurrent))
-            {
-                SolidBrush sb = new SolidBrush(colorBox1.SelectedColor);
-                g.DrawString(textBox1.Text, textBox1.Font, sb,
-                    textBox1.Left - imageProcessBox1.SelectedRectangle.Left,
-                    textBox1.Top - imageProcessBox1.SelectedRectangle.Top);
-                sb.Dispose();
-                textBox1.Text = "";
-                this.SetLayer();        //将文本绘制到当前图层并存入历史记录
-                imageProcessBox1.Invalidate();
-            }
-        }
-        //窗体大小改变时重置字体 从控件中获取字体大小
-        private void textBox1_Resize(object sender, EventArgs e)
-        {
-            //在三个大小选择的按钮点击中设置字体大小太麻烦 所以Resize中获取设置
-            int se = 10;
-            if (toolButton2.IsSelected) se = 12;
-            if (toolButton3.IsSelected) se = 14;
-            if (this.textBox1.Font.Height == se) return;
-            textBox1.Font = new Font(this.Font.FontFamily, se);
-        }
-        //撤销
-        private void tBtn_Cancel_Click(object sender, EventArgs e)
-        {
-            using (Graphics g = Graphics.FromImage(m_bmpLayerShow))
-            {
-                g.Clear(Color.Transparent);     //清空当前临时显示的图像
-            }
-            if (m_layer.Count > 0)
-            {            //删除最后一层
-                m_layer.RemoveAt(m_layer.Count - 1);
-                if (m_layer.Count > 0)
-                    m_bmpLayerCurrent = m_layer[m_layer.Count - 1].Clone() as Bitmap;
-                else
-                    m_bmpLayerCurrent = imageProcessBox1.GetResultBmp();
-                imageProcessBox1.Invalidate();
-                imageProcessBox1.CanReset = m_layer.Count == 0 && !HaveSelectedToolButton();
-            }
-            else
-            {                            //如果没有历史记录则取消本次截图
-                this.Enabled = false;
-                imageProcessBox1.ClearDraw();
-                imageProcessBox1.IsDrawOperationDot = false;
-                panel1.Visible = false;
-                panel2.Visible = false;
-            }
-        }
-
-        private void tBtn_Save_Click(object sender, EventArgs e)
-        {
-            //m_bSave = true;
-            SaveFileDialog saveDlg = new SaveFileDialog();
-            saveDlg.Filter = "Bitmap(*.bmp)|*.bmp|JPEG(*.jpg)|*.jpg";
-            saveDlg.FilterIndex = 2;
-            saveDlg.FileName = "CAPTURE_" + GetTimeString();
-            if (saveDlg.ShowDialog() == DialogResult.OK)
-            {
-                switch (saveDlg.FilterIndex)
-                {
-                    case 1:
-                        m_bmpLayerCurrent.Clone(new Rectangle(0, 0, m_bmpLayerCurrent.Width, m_bmpLayerCurrent.Height),
-                            System.Drawing.Imaging.PixelFormat.Format24bppRgb).Save(saveDlg.FileName,
-                            System.Drawing.Imaging.ImageFormat.Bmp);
-                        this.Close();
-                        break;
-                    case 2:
-                        m_bmpLayerCurrent.Save(saveDlg.FileName,
-                            System.Drawing.Imaging.ImageFormat.Jpeg);
-                        this.Close();
-                        break;
-                }
-            }
-            //m_bSave = false;
-        }
-        //将图像保存到剪贴板
-        private void tBtn_Finish_Click(object sender, EventArgs e)
-        {
-            this.OnCaptureFinished(m_bmpLayerCurrent);
-            this.Close();
-        }
-
-        private void imageProcessBox1_DoubleClick(object sender, EventArgs e)
-        {
-            Clipboard.SetImage(m_bmpLayerCurrent);
-            this.OnCaptureFinished(m_bmpLayerCurrent);
-            this.Close();
-        }
-
-        private void timer1_Tick(object sender, EventArgs e)
-        {
-            if (!this.Enabled)
-                imageProcessBox1.SetInfoPoint(MousePosition.X, MousePosition.Y);
-        }
-        //根据鼠标位置找寻窗体平绘制边框
-        private void FoundAndDrawWindowRect()
-        {
-            Win32.LPPOINT pt = new Win32.LPPOINT();
-            pt.X = MousePosition.X; pt.Y = MousePosition.Y;
-            IntPtr hWnd = Win32.ChildWindowFromPointEx(Win32.GetDesktopWindow(), pt,
-                Win32.CWP_SKIPINVISIBL | Win32.CWP_SKIPDISABLED);
-            if (hWnd != IntPtr.Zero)
-            {
-                IntPtr hTemp = hWnd;
-                while (true)
-                {
-                    Win32.ScreenToClient(hTemp, out pt);
-                    hTemp = Win32.ChildWindowFromPointEx(hWnd, pt, Win32.CWP_SKIPINVISIBL);
-                    if (hTemp == IntPtr.Zero || hTemp == hWnd)
-                        break;
-                    hWnd = hTemp;
-                    pt.X = MousePosition.X; pt.Y = MousePosition.Y; //坐标还原为屏幕坐标
-                }
-                Win32.LPRECT rect = new Win32.LPRECT();
-                Win32.GetWindowRect(hWnd, out rect);
-                imageProcessBox1.SetSelectRect(new Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top));
-            }
-        }
-        //获取桌面图像
+        
+        /// <summary>
+        /// 获取整个桌面图像
+        /// </summary>
+        /// <param name="bCaptureCursor"></param>
+        /// <param name="bFromClipBoard"></param>
+        /// <returns></returns>
         private static Bitmap GetScreen(bool bCaptureCursor, bool bFromClipBoard)
         {
-            Bitmap bmp = new Bitmap(Screen.PrimaryScreen.Bounds.Width,
-                    Screen.PrimaryScreen.Bounds.Height);
+            var bmp = new Bitmap(ScreenWidth, ScreenHeight);
             if (bCaptureCursor)      //是否捕获鼠标
                 DrawCurToScreen();
 
             //做完以上操作 才开始捕获桌面图像
-            using (Graphics g = Graphics.FromImage(bmp))
+
+            //create DC for the entire virtual screen
+            var hdcSrc = CreateDC("DISPLAY", null, null, IntPtr.Zero);
+            var hdcDest = CreateCompatibleDC(hdcSrc);
+            var hBitmap = CreateCompatibleBitmap(hdcSrc, ScreenWidth, ScreenHeight);
+            SelectObject(hdcDest, hBitmap);
+
+            // set the destination area White - a little complicated
+            using (Image ii = bmp)
             {
-                g.CopyFromScreen(0, 0, 0, 0, bmp.Size);
-                if (!bFromClipBoard) return bmp;
-                using (Image img_clip = Clipboard.GetImage())
+                using (var gf = Graphics.FromImage(ii))
                 {
-                    if (img_clip != null)
-                    {
-                        using (SolidBrush sb = new SolidBrush(Color.FromArgb(150, 0, 0, 0)))
-                        {
-                            g.FillRectangle(sb, 0, 0, bmp.Width, bmp.Height);
-                            g.DrawImage(img_clip,
-                                (bmp.Width - img_clip.Width) >> 1,
-                                (bmp.Height - img_clip.Height) >> 1,
-                                img_clip.Width, img_clip.Height);
-                        }
-                    }
+                    var hdc = gf.GetHdc();
+                    //use whiteness flag to make destination screen white
+                    BitBlt(hdcDest, 0, 0, ScreenWidth, ScreenHeight, (int)hdc, 0, 0, 0x00FF0062);
                 }
             }
-            return bmp;
+            
+            bmp.Dispose();
+
+            //Now copy the areas from each screen on the destination hbitmap
+            var screenData = Screen.AllScreens;
+            foreach (var t in screenData)
+            {
+                var Y = 0 < t.Bounds.Y ? t.Bounds.Y : 0;
+                if (t.Bounds.X > (0 + ScreenWidth) ||
+                    (t.Bounds.X + t.Bounds.Width) < 0 || t.Bounds.Y > (0 + ScreenHeight) ||
+                    (t.Bounds.Y + t.Bounds.Height) < 0)
+                {
+                    // no common area
+                }
+                else
+                {
+                    // something  common
+                    var X = 0 < t.Bounds.X ? t.Bounds.X : 0;
+                    int X1;
+                    if ((0 + ScreenWidth) > (t.Bounds.X + t.Bounds.Width))
+                        X1 = t.Bounds.X + t.Bounds.Width;
+                    else X1 = 0 + ScreenWidth;
+                    int Y1;
+                    if ((0 + ScreenHeight) > (t.Bounds.Y + t.Bounds.Height))
+                        Y1 = t.Bounds.Y + t.Bounds.Height;
+                    else Y1 = 0 + ScreenHeight;
+                    // Main API that does memory data transfer
+                    BitBlt(hdcDest, X - 0, Y - 0, X1 - X, Y1 - Y, hdcSrc, X, Y,
+                        0x40000000 | 0x00CC0020); //SRCCOPY AND CAPTUREBLT
+                }
+            }
+
+            // send image to clipboard
+            var imf = Image.FromHbitmap(new IntPtr(hBitmap));
+            //Clipboard.SetImage(imf);
+            DeleteDC(hdcSrc);
+            DeleteDC(hdcDest);
+            DeleteObject(hBitmap);
+
+            return imf;
+            //imf.Dispose();
+
+            //// g.CopyFromScreen 无法捕捉多个显示器的
+            //using (var g = Graphics.FromImage(bmp))
+            //{
+            //    g.CopyFromScreen(0, 0, 0, 0, bmp.Size);
+            //    if (!bFromClipBoard) return bmp;
+            //    using (var img_clip = Clipboard.GetImage())
+            //    {
+            //        if (img_clip == null) return bmp;
+            //        using (var sb = new SolidBrush(Color.FromArgb(150, 0, 0, 0)))
+            //        {
+            //            g.FillRectangle(sb, 0, 0, bmp.Width, bmp.Height);
+            //            g.DrawImage(img_clip,
+            //                (bmp.Width - img_clip.Width) >> 1,
+            //                (bmp.Height - img_clip.Height) >> 1,
+            //                img_clip.Width, img_clip.Height);
+            //        }
+            //    }
+            //}
+            //return bmp;
         }
-        //在桌面绘制鼠标
+
+        /// <summary>
+        /// 在桌面绘制鼠标
+        /// </summary>
+        /// <returns></returns>
         public static Rectangle DrawCurToScreen()
         {
             //如果直接将捕获当的鼠标画在bmp上 光标不会反色 指针边框也很浓 也就是说
@@ -601,6 +697,7 @@ namespace ScreenCapture
                 return Rectangle.Empty;
             }
         }
+        
         //设置工具条位置
         private void SetToolBarLocation()
         {
@@ -624,6 +721,7 @@ namespace ScreenCapture
             panel1.Top = tempY;
             panel2.Top = imageProcessBox1.SelectedRectangle.Top > tempY ? tempY - tempHeight : panel1.Bottom + 2;
         }
+        
         //确定是否工具条上面有被选中的按钮
         private bool HaveSelectedToolButton()
         {
@@ -631,35 +729,42 @@ namespace ScreenCapture
                 || tBtn_Arrow.IsSelected || tBtn_Brush.IsSelected
                 || tBtn_Text.IsSelected;
         }
+        
         //清空选中的工具条上的工具
         private void ClearToolBarBtnSelected()
         {
             tBtn_Rect.IsSelected = tBtn_Ellipse.IsSelected = tBtn_Arrow.IsSelected =
                 tBtn_Brush.IsSelected = tBtn_Text.IsSelected = false;
         }
-        //设置历史图层
+
+        /// <summary>
+        /// 设置历史图层
+        /// </summary>
         private void SetLayer()
         {
-            if (this.IsDisposed) return;
-            using (Graphics g = Graphics.FromImage(m_bmpLayerCurrent))
+            if (IsDisposed) return;
+            using (var g = Graphics.FromImage(m_bmpLayerCurrent))
             {
                 g.DrawImage(m_bmpLayerShow, 0, 0);
             }
-            Bitmap bmpTemp = m_bmpLayerCurrent.Clone() as Bitmap;
+            var bmpTemp = m_bmpLayerCurrent.Clone() as Bitmap;
             m_layer.Add(bmpTemp);
         }
-        //保存时获取当前时间字符串作文默认文件名
-        private string GetTimeString()
+
+        /// <summary>
+        /// 保存时获取当前时间字符串作文默认文件名
+        /// </summary>
+        /// <returns></returns>
+        private static string GetTimeString()
         {
-            DateTime time = DateTime.Now;
+            var time = DateTime.Now;
             return time.Date.ToShortDateString().Replace("/", "") + "_" +
                 time.ToLongTimeString().Replace(":", "");
         }
 
         private void OnCaptureFinished(Bitmap bitmap)
         {
-            if (this.CaptureFinished != null)
-                this.CaptureFinished(bitmap);
+            CaptureFinished?.Invoke(bitmap);
         }
     }
 }

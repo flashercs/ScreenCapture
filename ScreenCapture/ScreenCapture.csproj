@@ -69,7 +69,7 @@
     <Compile Include="ColorBox.Designer.cs">
       <DependentUpon>ColorBox.cs</DependentUpon>
     </Compile>
-    <Compile Include="ColorBoxDesginer.cs" />
+    <Compile Include="ColorBoxDesigner.cs" />
     <Compile Include="ColorChangedEventArgs.cs" />
     <Compile Include="FrmCapture.cs">
       <SubType>Form</SubType>

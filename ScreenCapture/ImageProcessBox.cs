@@ -8,11 +8,14 @@ using System.Windows.Forms;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Drawing;
+using static ScreenCapture.ImageProcessBox;
 
 namespace ScreenCapture
 {
     public partial class ImageProcessBox : Control
     {
+        #region Members
+
         private bool _IsMouseEnter;
         private bool m_bLockH;
         private bool m_bLockW;
@@ -40,6 +43,8 @@ namespace ScreenCapture
         private bool isStartDraw;
         private bool isMoving;
         private bool canReset;
+
+        #endregion
 
         public ImageProcessBox()
         {
@@ -79,6 +84,7 @@ namespace ScreenCapture
                 m_rectDots[i] = new Rectangle(-10, -10, 5, 5);
             }
         }
+        
         //貌似析构函数不执行
         ~ImageProcessBox()
         {
@@ -91,7 +97,7 @@ namespace ScreenCapture
             }
         }
 
-        public void DeleResource()
+        public void DeleteResource()
         {
             m_pen.Dispose();
             m_sb.Dispose();
@@ -110,7 +116,7 @@ namespace ScreenCapture
         [Category("Custom"), Description("获取或设置用于被操作的图像")]
         public Image BaseImage
         {
-            get { return baseImage; }
+            get => baseImage;
             set
             {
                 baseImage = value;
@@ -287,11 +293,6 @@ namespace ScreenCapture
         }
         #endregion
 
-        #region Member variable
-
-
-        #endregion
-
         protected override void OnMouseDown(MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
@@ -422,14 +423,13 @@ namespace ScreenCapture
             }
 
             #endregion
-            //绘制放大信息
-            //if (this.baseImage != null && !isDrawed && !isMoving && isShowInfo)
-            //    this.Invalidate();
+            
             base.OnMouseMove(e);
         }
 
         protected override void OnMouseLeave(EventArgs e)
         {
+            //Debug.WriteLine($"ImageProcessBox.OnMouseLeave: {MousePosition.X},{MousePosition.Y}");
             _IsMouseEnter = false;
             this.Invalidate();
             base.OnMouseLeave(e);
@@ -452,6 +452,7 @@ namespace ScreenCapture
             this.Invalidate();
             base.OnMouseUp(e);
         }
+        
         //响应四个按键实现精确移动
         protected override void OnKeyPress(KeyPressEventArgs e)
         {
@@ -468,17 +469,19 @@ namespace ScreenCapture
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            Graphics g = e.Graphics;
-            if (this.baseImage != null)
+            var g = e.Graphics;
+            if (BaseImage != null)
             {
                 g.DrawImage(m_bmpDark, 0, 0);
-                g.DrawImage(this.baseImage, this.selectedRectangle, this.selectedRectangle, GraphicsUnit.Pixel);
+                g.DrawImage(BaseImage, selectedRectangle, selectedRectangle, GraphicsUnit.Pixel);
             }
             this.DrawOperationBox(g);
-            if (this.baseImage != null && !isDrawed && !isMoving && _IsMouseEnter && isShowInfo)
+            if (baseImage != null && !isDrawed && !isMoving && _IsMouseEnter && isShowInfo)
                 DrawInfo(e.Graphics);
+
             base.OnPaint(e);
         }
+        
         //绘制操作框
         protected virtual void DrawOperationBox(Graphics g)
         {
@@ -524,10 +527,10 @@ namespace ScreenCapture
             if (this.selectedRectangle.Width <= 10 || this.selectedRectangle.Height <= 10)
                 g.DrawRectangle(m_pen, this.selectedRectangle);
         }
+        
         //绘制图像放大信息
         protected virtual void DrawInfo(Graphics g)
         {
-
             #region Calculate point
 
             int tempX = m_ptCurrent.X + 20;
@@ -555,14 +558,14 @@ namespace ScreenCapture
 
             #region Draw the magnified image
 
-            using (Bitmap bmpSrc = new Bitmap(this.magnifySize.Width, this.magnifySize.Height, PixelFormat.Format32bppArgb))
+            using (var bmpSrc = new Bitmap(this.magnifySize.Width, this.magnifySize.Height, PixelFormat.Format32bppArgb))
             {
-                using (Graphics gp = Graphics.FromImage(bmpSrc))
+                using (var gp = Graphics.FromImage(bmpSrc))
                 {
                     //gp.SetClip(new Rectangle(0, 0, this.magnifySize.Width, this.magnifySize.Height));
-                    gp.DrawImage(this.baseImage, -(m_ptCurrent.X - this.magnifySize.Width / 2), -(m_ptCurrent.Y - this.magnifySize.Height / 2));
+                    gp.DrawImage(baseImage, -(m_ptCurrent.X - this.magnifySize.Width / 2), -(m_ptCurrent.Y - this.magnifySize.Height / 2));
                 }
-                using (Bitmap bmpInfo = ImageProcessBox.MagnifyImage(bmpSrc, this.magnifyTimes))
+                using (var bmpInfo = MagnifyImage(bmpSrc, this.magnifyTimes))
                 {
                     g.DrawImage(bmpInfo, tempX + 4, tempY + 4);
                 }
@@ -572,15 +575,19 @@ namespace ScreenCapture
 
             m_pen.Width = this.magnifyTimes - 2;
             m_pen.Color = Color.FromArgb(125, 0, 255, 255);
-            int tempCenterX = tempX + (tempW + (this.magnifySize.Width % 2 == 0 ? this.magnifyTimes : 0)) / 2;
-            int tempCenterY = tempY + 2 + (tempRectBorder.Height + (this.MagnifySize.Height % 2 == 0 ? this.magnifyTimes : 0)) / 2;
+            var tempCenterX = tempX + (tempW + (this.magnifySize.Width % 2 == 0 ? this.magnifyTimes : 0)) / 2;
+            var tempCenterY = tempY + 2 + (tempRectBorder.Height + (this.MagnifySize.Height % 2 == 0 ? this.magnifyTimes : 0)) / 2;
             g.DrawLine(m_pen, tempCenterX, tempY + 4, tempCenterX, tempRectBorder.Bottom - 2);
             g.DrawLine(m_pen, tempX + 4, tempCenterY, tempX + tempW - 4, tempCenterY);
 
             #region Draw Info
 
             m_sb.Color = this.ForeColor;
-            Color clr = ((Bitmap)this.baseImage).GetPixel(m_ptCurrent.X, m_ptCurrent.Y);
+
+            //TODO 
+            Color clr = LineColor;
+            if (m_ptCurrent.X > 0 && m_ptCurrent.Y > 0)
+                clr = ((Bitmap) baseImage).GetPixel(m_ptCurrent.X, m_ptCurrent.Y);
             g.DrawString("Size: " + (this.selectedRectangle.Width + 1) + " x "
                 + (this.selectedRectangle.Height + 1),
                 this.Font, m_sb, tempX + 2, tempRectBorder.Bottom + 2);
@@ -611,6 +618,7 @@ namespace ScreenCapture
 
             #endregion
         }
+        
         //放大图形
         private static Bitmap MagnifyImage(Bitmap bmpSrc, int times)
         {
@@ -642,6 +650,7 @@ namespace ScreenCapture
             bmpNew.UnlockBits(bmpNewData);
             return bmpNew;
         }
+        
         //设置鼠标指针样式
         private void SetCursorStyle(Point loc)
         {
@@ -726,6 +735,7 @@ namespace ScreenCapture
             this.selectedRectangle = rectTemp;
             this.Invalidate();
         }
+        
         /// <summary>
         /// 手动设置信息显示的位置
         /// </summary>
@@ -737,6 +747,7 @@ namespace ScreenCapture
             _IsMouseEnter = true;
             this.Invalidate();
         }
+        
         /// <summary>
         /// 手动设置信息显示的位置
         /// </summary>
@@ -750,6 +761,7 @@ namespace ScreenCapture
             _IsMouseEnter = true;
             this.Invalidate();
         }
+        
         /// <summary>
         /// 获取操作框内的图像
         /// </summary>

@@ -9,7 +9,7 @@ using System.Drawing;
 
 namespace ScreenCapture
 {
-    [Designer(typeof(ColorBoxDesginer))]
+    [Designer(typeof(ColorBoxDesigner))]
     public partial class ColorBox : Control
     {
         #region 变量
