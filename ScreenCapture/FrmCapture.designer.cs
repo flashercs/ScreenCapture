@@ -75,7 +75,7 @@
             this.pictureBox2.Image = global::ScreenCapture.Properties.Resources.separator;
             this.pictureBox2.Location = new System.Drawing.Point(226, 1);
             this.pictureBox2.Name = "pictureBox2";
-            this.pictureBox2.Size = new System.Drawing.Size(1, 16);
+            this.pictureBox2.Size = new System.Drawing.Size(2, 26);
             this.pictureBox2.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
             this.pictureBox2.TabIndex = 10;
             this.pictureBox2.TabStop = false;
@@ -85,7 +85,7 @@
             this.pictureBox1.Image = global::ScreenCapture.Properties.Resources.separator;
             this.pictureBox1.Location = new System.Drawing.Point(138, 1);
             this.pictureBox1.Name = "pictureBox1";
-            this.pictureBox1.Size = new System.Drawing.Size(1, 16);
+            this.pictureBox1.Size = new System.Drawing.Size(2, 26);
             this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
             this.pictureBox1.TabIndex = 9;
             this.pictureBox1.TabStop = false;
@@ -267,7 +267,9 @@
             this.imageProcessBox1.CanReset = true;
             this.imageProcessBox1.Cursor = System.Windows.Forms.Cursors.Default;
             this.imageProcessBox1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.imageProcessBox1.DotColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(170)))), ((int)(((byte)(255)))));
             this.imageProcessBox1.ForeColor = System.Drawing.Color.White;
+            this.imageProcessBox1.LineColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(170)))), ((int)(((byte)(255)))));
             this.imageProcessBox1.Location = new System.Drawing.Point(0, 0);
             this.imageProcessBox1.Name = "imageProcessBox1";
             this.imageProcessBox1.Size = new System.Drawing.Size(363, 247);
@@ -289,6 +291,7 @@
             this.Controls.Add(this.panel1);
             this.Controls.Add(this.imageProcessBox1);
             this.Name = "FrmCapture";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             this.Text = "FrmCapture";
             this.Load += new System.EventHandler(this.FrmCapture_Load);
             this.panel1.ResumeLayout(false);

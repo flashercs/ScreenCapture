@@ -23,3 +23,4 @@ D:\1-Code\4_CheckTools\ScreenCapture\ScreenCapture\obj\Debug\ScreenCapture.cspro
 D:\1-Code\4_CheckTools\ScreenCapture\ScreenCapture\obj\Debug\ScreenCapture.csproj.CoreCompileInputs.cache
 D:\1-Code\4_CheckTools\ScreenCapture\ScreenCapture\obj\Debug\ScreenCapture.dll
 D:\1-Code\4_CheckTools\ScreenCapture\ScreenCapture\obj\Debug\ScreenCapture.pdb
+D:\1-Code\4_CheckTools\ScreenCapture\ScreenCapture\obj\Debug\ScreenCapture.csprojAssemblyReference.cache

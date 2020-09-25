@@ -161,6 +161,7 @@ $RECYCLE.BIN/
 # VisualStudioCode
 .vscode
 
+*.pdb
 .vs/
 .svn
 .svn/

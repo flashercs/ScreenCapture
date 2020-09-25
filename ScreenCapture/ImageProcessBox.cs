@@ -485,7 +485,6 @@ namespace ScreenCapture
         //绘制操作框
         protected virtual void DrawOperationBox(Graphics g)
         {
-
             #region Draw SizeInfo
 
             string strDrawSize = "X:" + this.selectedRectangle.X + " Y:" + this.selectedRectangle.Y +
@@ -531,92 +530,106 @@ namespace ScreenCapture
         //绘制图像放大信息
         protected virtual void DrawInfo(Graphics g)
         {
-            #region Calculate point
-
-            int tempX = m_ptCurrent.X + 20;
-            int tempY = m_ptCurrent.Y + 20;
-            int tempW = this.magnifySize.Width * this.magnifyTimes + 8;
-            int tempH = this.magnifySize.Width * this.magnifyTimes + 12 + this.Font.Height * 3;
-            if (!m_rectClip.IsEmpty)
+            try
             {
-                if (tempX + tempW >= this.m_rectClip.Right) tempX -= tempW + 30;
-                if (tempY + tempH >= this.m_rectClip.Bottom) tempY -= tempH + 30;
-            }
-            else
-            {
-                if (tempX + tempW >= this.ClientRectangle.Width) tempX -= tempW + 30;
-                if (tempY + tempH >= this.ClientRectangle.Height) tempY -= tempH + 30;
-            }
-            Rectangle tempRectBorder = new Rectangle(tempX + 2, tempY + 2, tempW - 4, this.magnifySize.Width * this.magnifyTimes + 4);
+                // 鼠标坐标转为为BaseImage坐标 -> 主显示器在右侧的情况 屏幕最左上点的坐标是负数
+                var mouseX = m_ptCurrent.X - FrmCapture.StartLocation.X;
+                var mouseY = m_ptCurrent.Y - FrmCapture.StartLocation.Y;
 
-            #endregion
+                #region Calculate point
 
-            m_sb.Color = Color.FromArgb(200, 0, 0, 0);
-            g.FillRectangle(m_sb, tempX, tempY, tempW, tempH);
-            m_pen.Width = 2; m_pen.Color = Color.White;
-            g.DrawRectangle(m_pen, tempRectBorder);
-
-            #region Draw the magnified image
-
-            using (var bmpSrc = new Bitmap(this.magnifySize.Width, this.magnifySize.Height, PixelFormat.Format32bppArgb))
-            {
-                using (var gp = Graphics.FromImage(bmpSrc))
+                var tempX = mouseX + 20;
+                var tempY = mouseY + 20;
+                var tempW = this.magnifySize.Width * this.magnifyTimes + 8;
+                var tempH = this.magnifySize.Width * this.magnifyTimes + 12 + this.Font.Height * 3;
+                if (!m_rectClip.IsEmpty)
                 {
-                    //gp.SetClip(new Rectangle(0, 0, this.magnifySize.Width, this.magnifySize.Height));
-                    gp.DrawImage(baseImage, -(m_ptCurrent.X - this.magnifySize.Width / 2), -(m_ptCurrent.Y - this.magnifySize.Height / 2));
+                    if (tempX + tempW >= this.m_rectClip.Right) tempX -= tempW + 30;
+                    if (tempY + tempH >= this.m_rectClip.Bottom) tempY -= tempH + 30;
                 }
-                using (var bmpInfo = MagnifyImage(bmpSrc, this.magnifyTimes))
+                else
                 {
-                    g.DrawImage(bmpInfo, tempX + 4, tempY + 4);
+                    if (tempX + tempW >= this.ClientRectangle.Width) tempX -= tempW + 30;
+                    if (tempY + tempH >= this.ClientRectangle.Height) tempY -= tempH + 30;
                 }
+                var tempRectBorder = new Rectangle(tempX + 2, tempY + 2, tempW - 4, 
+                    this.magnifySize.Width * this.magnifyTimes + 4);
+
+                #endregion
+
+                m_sb.Color = Color.FromArgb(200, 0, 0, 0);
+                g.FillRectangle(m_sb, tempX, tempY, tempW, tempH);
+                m_pen.Width = 2; m_pen.Color = Color.White;
+                g.DrawRectangle(m_pen, tempRectBorder);
+
+                #region Draw the magnified image
+
+                using (var bmpSrc = new Bitmap(this.magnifySize.Width, this.magnifySize.Height, PixelFormat.Format32bppArgb))
+                {
+                    using (var gp = Graphics.FromImage(bmpSrc))
+                    {
+                        //gp.SetClip(new Rectangle(0, 0, this.magnifySize.Width, this.magnifySize.Height));
+                        gp.DrawImage(baseImage, -(mouseX - this.magnifySize.Width / 2), -(mouseY - this.magnifySize.Height / 2));
+                    }
+                    using (var bmpInfo = MagnifyImage(bmpSrc, this.magnifyTimes))
+                    {
+                        g.DrawImage(bmpInfo, tempX + 4, tempY + 4);
+                    }
+                }
+
+                #endregion
+
+                m_pen.Width = this.magnifyTimes - 2;
+                m_pen.Color = Color.FromArgb(125, 0, 255, 255);
+                var tempCenterX = tempX + (tempW + (this.magnifySize.Width % 2 == 0 ? this.magnifyTimes : 0)) / 2;
+                var tempCenterY = tempY + 2 + (tempRectBorder.Height + (this.MagnifySize.Height % 2 == 0 ? this.magnifyTimes : 0)) / 2;
+                g.DrawLine(m_pen, tempCenterX, tempY + 4, tempCenterX, tempRectBorder.Bottom - 2);
+                g.DrawLine(m_pen, tempX + 4, tempCenterY, tempX + tempW - 4, tempCenterY);
+
+                #region Draw Info
+
+                m_sb.Color = this.ForeColor;
+            
+                Color clr = LineColor;
+                if (mouseX > 0 && mouseY > 0)
+                    clr = ((Bitmap) baseImage).GetPixel(mouseX, mouseY); // TODO 多屏幕坐标转为为BaseImage坐标
+                g.DrawString("Size: " + (this.selectedRectangle.Width + 1) + " x "
+                             + (this.selectedRectangle.Height + 1),
+                    Font, m_sb, tempX + 2, tempRectBorder.Bottom + 2);
+                //g.DrawString("坐标: " + (KKK.X) + " x "
+                //             + (KKK.Y),
+                //    Font, m_sb, tempX + 2, tempRectBorder.Bottom + 2);
+                g.DrawString(clr.A + "," + clr.R + "," + clr.G + "," + clr.B,
+                    this.Font, m_sb, tempX + 2, tempRectBorder.Bottom + 2 + this.Font.Height);
+                g.DrawString("0x" + clr.A.ToString("X").PadLeft(2, '0') +
+                             clr.R.ToString("X").PadLeft(2, '0') +
+                             clr.G.ToString("X").PadLeft(2, '0') +
+                             clr.B.ToString("X").PadLeft(2, '0'),
+                    this.Font, m_sb, tempX + 2, tempRectBorder.Bottom + 2 + this.Font.Height * 2);
+                m_sb.Color = clr;
+                g.FillRectangle(m_sb, tempX + tempW - 2 - this.Font.Height,         //右下角颜色
+                    tempY + tempH - 2 - this.Font.Height,
+                    this.Font.Height,
+                    this.Font.Height);
+                g.DrawRectangle(Pens.Cyan, tempX + tempW - 2 - this.Font.Height,    //右下角颜色边框
+                    tempY + tempH - 2 - this.Font.Height,
+                    this.Font.Height,
+                    this.Font.Height);
+                g.FillRectangle(m_sb, tempCenterX - this.magnifyTimes / 2,          //十字架中间颜色
+                    tempCenterY - this.magnifyTimes / 2,
+                    this.magnifyTimes,
+                    this.magnifyTimes);
+                g.DrawRectangle(Pens.Cyan, tempCenterX - this.magnifyTimes / 2,     //十字架中间边框
+                    tempCenterY - this.magnifyTimes / 2,
+                    this.magnifyTimes - 1,
+                    this.magnifyTimes - 1);
+
+                #endregion
             }
-
-            #endregion
-
-            m_pen.Width = this.magnifyTimes - 2;
-            m_pen.Color = Color.FromArgb(125, 0, 255, 255);
-            var tempCenterX = tempX + (tempW + (this.magnifySize.Width % 2 == 0 ? this.magnifyTimes : 0)) / 2;
-            var tempCenterY = tempY + 2 + (tempRectBorder.Height + (this.MagnifySize.Height % 2 == 0 ? this.magnifyTimes : 0)) / 2;
-            g.DrawLine(m_pen, tempCenterX, tempY + 4, tempCenterX, tempRectBorder.Bottom - 2);
-            g.DrawLine(m_pen, tempX + 4, tempCenterY, tempX + tempW - 4, tempCenterY);
-
-            #region Draw Info
-
-            m_sb.Color = this.ForeColor;
-
-            //TODO 
-            Color clr = LineColor;
-            if (m_ptCurrent.X > 0 && m_ptCurrent.Y > 0)
-                clr = ((Bitmap) baseImage).GetPixel(m_ptCurrent.X, m_ptCurrent.Y);
-            g.DrawString("Size: " + (this.selectedRectangle.Width + 1) + " x "
-                + (this.selectedRectangle.Height + 1),
-                this.Font, m_sb, tempX + 2, tempRectBorder.Bottom + 2);
-            g.DrawString(clr.A + "," + clr.R + "," + clr.G + "," + clr.B,
-                this.Font, m_sb, tempX + 2, tempRectBorder.Bottom + 2 + this.Font.Height);
-            g.DrawString("0x" + clr.A.ToString("X").PadLeft(2, '0') +
-                clr.R.ToString("X").PadLeft(2, '0') +
-                clr.G.ToString("X").PadLeft(2, '0') +
-                clr.B.ToString("X").PadLeft(2, '0'),
-                this.Font, m_sb, tempX + 2, tempRectBorder.Bottom + 2 + this.Font.Height * 2);
-            m_sb.Color = clr;
-            g.FillRectangle(m_sb, tempX + tempW - 2 - this.Font.Height,         //右下角颜色
-                tempY + tempH - 2 - this.Font.Height,
-                this.Font.Height,
-                this.Font.Height);
-            g.DrawRectangle(Pens.Cyan, tempX + tempW - 2 - this.Font.Height,    //右下角颜色边框
-                tempY + tempH - 2 - this.Font.Height,
-                this.Font.Height,
-                this.Font.Height);
-            g.FillRectangle(m_sb, tempCenterX - this.magnifyTimes / 2,          //十字架中间颜色
-                tempCenterY - this.magnifyTimes / 2,
-                this.magnifyTimes,
-                this.magnifyTimes);
-            g.DrawRectangle(Pens.Cyan, tempCenterX - this.magnifyTimes / 2,     //十字架中间边框
-                tempCenterY - this.magnifyTimes / 2,
-                this.magnifyTimes - 1,
-                this.magnifyTimes - 1);
-
-            #endregion
+            catch (Exception e)
+            {
+                Debug.WriteLine($"ImageProcessBox.DrawInfo {e}");
+            }
         }
         
         //放大图形
@@ -696,12 +709,16 @@ namespace ScreenCapture
         /// <param name="rect">要选中区域</param>
         public void SetSelectRect(Rectangle rect)
         {
-            rect.Intersect(this.DisplayRectangle);
-            if (rect.IsEmpty) return;
-            rect.Width--; rect.Height--;
-            if (this.selectedRectangle == rect) return;
-            this.selectedRectangle = rect;
-            this.Invalidate();
+            rect.Intersect(DisplayRectangle);
+            if (rect.IsEmpty) 
+                return;
+            rect.Width--; 
+            rect.Height--;
+
+            if (selectedRectangle == rect) 
+                return;
+            selectedRectangle = rect;
+            Invalidate();
         }
         /// <summary>
         /// 手动设置一个块选中区域

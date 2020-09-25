@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Windows.Forms;
 using static ScreenCapture.Win32;
@@ -28,8 +29,8 @@ namespace ScreenCapture
 
             // 如果1号屏幕在右边，那就不行了
             FormBorderStyle = FormBorderStyle.None;
-            Location = new Point(0, 0);
-            //Screen.PrimaryScreen.Bounds.Height
+            Location = StartLocation;
+            
             Size = new Size(ScreenWidth, ScreenHeight);
             TopMost = true;
             ShowInTaskbar = false;
@@ -37,9 +38,16 @@ namespace ScreenCapture
             m_MHook = new MouseHook();
             this.FormClosing += (s, e) =>
             {
-                this.timer1.Dispose();
-                m_MHook.UnLoadHook();
-                this.DeleteResource();
+                try
+                {
+                    this.timer1.Dispose();
+                    m_MHook.UnLoadHook();
+                    this.DeleteResource();
+                }
+                catch (Exception exception)
+                {
+                    System.Diagnostics.Debug.WriteLine($"FormClosing {exception}");
+                }
             };
             this.panel1.Paint += panel1_Paint;
             this.panel2.Paint += panel1_Paint;
@@ -72,6 +80,12 @@ namespace ScreenCapture
         #endregion
 
         #region Properties
+
+        /// <summary>
+        /// 多个屏幕最左上角的点
+        /// </summary>
+        public static Point StartLocation => new Point(Screen.AllScreens.Min(s => s.Bounds.X),
+            Screen.AllScreens.Min(s => s.Bounds.Y));
 
         public static int ScreenWidth => Screen.AllScreens.Sum(screen => screen.Bounds.Width);
 
@@ -145,6 +159,7 @@ namespace ScreenCapture
         {
             this.InitMember();
             imageProcessBox1.BaseImage = GetScreen(IsCaptureCursor, IsFromClipBoard);
+            //imageProcessBox1.BaseImage.Save("C://1.bmp", ImageFormat.Bmp);
             m_MHook.SetHook();
             m_MHook.MHookEvent += m_MHook_MHookEvent;
             imageProcessBox1.IsDrawOperationDot = false;
@@ -323,9 +338,17 @@ namespace ScreenCapture
         /// <param name="e"></param>
         private void tBtn_Finish_Click(object sender, EventArgs e)
         {
-            Clipboard.SetImage(m_bmpLayerCurrent);
-            this.OnCaptureFinished(m_bmpLayerCurrent);
-            this.Close();
+            try
+            {
+                Clipboard.SetImage(m_bmpLayerCurrent);
+                this.OnCaptureFinished(m_bmpLayerCurrent);
+                this.Close();
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine($"tBtn_Finish_Click {exception}");
+                this.Close();
+            }
         }
 
         private void imageProcessBox1_DoubleClick(object sender, EventArgs e)
@@ -371,7 +394,9 @@ namespace ScreenCapture
             }
 
             Win32.GetWindowRect(hWnd, out var rect);
-            imageProcessBox1.SetSelectRect(new Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top));
+            imageProcessBox1.SetSelectRect(
+                new Rectangle(rect.Left- StartLocation.X, rect.Top- StartLocation.Y, rect.Right - rect.Left, rect.Bottom - rect.Top));
+            System.Diagnostics.Debug.WriteLine($"鼠标坐标: {rect.Left},{rect.Top}");
         }
 
         #region 文本框
@@ -379,8 +404,17 @@ namespace ScreenCapture
         //文本改变时重置文本框大小
         private void textBox1_TextChanged(object sender, EventArgs e)
         {
-            var se = TextRenderer.MeasureText(textBox1.Text, textBox1.Font);
-            textBox1.Size = se.IsEmpty ? new Size(50, textBox1.Font.Height) : se;
+            try
+            {
+                var se = TextRenderer.MeasureText(textBox1.Text, textBox1.Font);
+                textBox1.Size = se.IsEmpty ? new Size(50, textBox1.Font.Height) : se;
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine($"textBox1_TextChanged {exception}");
+                this.Close();
+            }
+            
         }
 
         //文本框失去焦点时 绘制文本
@@ -612,29 +646,32 @@ namespace ScreenCapture
 
             //Now copy the areas from each screen on the destination hbitmap
             var screenData = Screen.AllScreens;
+            int X, X1, Y, Y1;
+            var x = StartLocation.X;
+            var y = StartLocation.Y;
+            var wid = ScreenWidth;
+            var hei = ScreenHeight;
+
             foreach (var t in screenData)
             {
-                var Y = 0 < t.Bounds.Y ? t.Bounds.Y : 0;
-                if (t.Bounds.X > (0 + ScreenWidth) ||
-                    (t.Bounds.X + t.Bounds.Width) < 0 || t.Bounds.Y > (0 + ScreenHeight) ||
-                    (t.Bounds.Y + t.Bounds.Height) < 0)
+                if (t.Bounds.X > (x + wid) || (t.Bounds.X + t.Bounds.Width) < x || t.Bounds.Y > (y + hei) ||
+                    (t.Bounds.Y + t.Bounds.Height) < y)
                 {
                     // no common area
                 }
                 else
                 {
                     // something  common
-                    var X = 0 < t.Bounds.X ? t.Bounds.X : 0;
-                    int X1;
-                    if ((0 + ScreenWidth) > (t.Bounds.X + t.Bounds.Width))
+                    if (x < t.Bounds.X) X = t.Bounds.X; else X = x;
+                    if ((x + wid) > (t.Bounds.X + t.Bounds.Width))
                         X1 = t.Bounds.X + t.Bounds.Width;
-                    else X1 = 0 + ScreenWidth;
-                    int Y1;
-                    if ((0 + ScreenHeight) > (t.Bounds.Y + t.Bounds.Height))
+                    else X1 = x + wid;
+                    if (y < t.Bounds.Y) Y = t.Bounds.Y; else Y = y;
+                    if ((y + hei) > (t.Bounds.Y + t.Bounds.Height))
                         Y1 = t.Bounds.Y + t.Bounds.Height;
-                    else Y1 = 0 + ScreenHeight;
+                    else Y1 = y + hei;
                     // Main API that does memory data transfer
-                    BitBlt(hdcDest, X - 0, Y - 0, X1 - X, Y1 - Y, hdcSrc, X, Y,
+                    BitBlt(hdcDest, X - x, Y - y, X1 - X, Y1 - Y, hdcSrc, X, Y,
                         0x40000000 | 0x00CC0020); //SRCCOPY AND CAPTUREBLT
                 }
             }
@@ -653,6 +690,7 @@ namespace ScreenCapture
             //using (var g = Graphics.FromImage(bmp))
             //{
             //    g.CopyFromScreen(0, 0, 0, 0, bmp.Size);
+                
             //    if (!bFromClipBoard) return bmp;
             //    using (var img_clip = Clipboard.GetImage())
             //    {
