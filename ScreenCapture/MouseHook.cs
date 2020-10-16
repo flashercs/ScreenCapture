@@ -57,36 +57,34 @@ namespace ScreenCapture
         //Hook回调函数
         private int MouseHookProcedure(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            if (nCode >= 0 && MHookEvent != null)
-            {
-                MSLLHOOTSTRUCT stMSLL = (MSLLHOOTSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOTSTRUCT));
-                ButtonStatus btnStatus = ButtonStatus.None;
-                if (wParam == (IntPtr)WM_LBUTTONDOWN)
-                    btnStatus = ButtonStatus.LeftDown;
-                else if (wParam == (IntPtr)WM_LBUTTONUP)
-                    btnStatus = ButtonStatus.LeftUp;
-                else if (wParam == (IntPtr)WM_RBUTTONDOWN)
-                    btnStatus = ButtonStatus.RightDown;
-                else if (wParam == (IntPtr)WM_RBUTTONUP)
-                    btnStatus = ButtonStatus.RightUp;
-                MHookEvent(this, new MHookEventArgs(btnStatus, stMSLL.pt.X, stMSLL.pt.Y));
-            }
+            if (nCode < 0 || MHookEvent == null) return CallNextHookEx(hHook, nCode, wParam, lParam);
+            var stMSLL = (MSLLHOOTSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOTSTRUCT));
+            var btnStatus = ButtonStatus.None;
+            if (wParam == (IntPtr)WM_LBUTTONDOWN)
+                btnStatus = ButtonStatus.LeftDown;
+            else if (wParam == (IntPtr)WM_LBUTTONUP)
+                btnStatus = ButtonStatus.LeftUp;
+            else if (wParam == (IntPtr)WM_RBUTTONDOWN)
+                btnStatus = ButtonStatus.RightDown;
+            else if (wParam == (IntPtr)WM_RBUTTONUP)
+                btnStatus = ButtonStatus.RightUp;
+            MHookEvent(this, new MHookEventArgs(btnStatus, stMSLL.pt.X, stMSLL.pt.Y));
             return CallNextHookEx(hHook, nCode, wParam, lParam);
         }
+
         //设置Hook
         public bool SetHook()
         {
             if (hHook != IntPtr.Zero)
                 return false;
-            HookProc mouseCallBack = new HookProc(MouseHookProcedure);
-            hHook = SetWindowsHookEx(WH_MOUSE_LL, mouseCallBack,
-                GetModuleHandle(Process.GetCurrentProcess().MainModule.ModuleName), 0);
-            if (hHook != IntPtr.Zero)
-            {
-                gc = GCHandle.Alloc(mouseCallBack);
-                return true;
-            }
-            return false;
+            var mouseCallBack = new HookProc(MouseHookProcedure);
+            var processModule = Process.GetCurrentProcess().MainModule;
+            if (processModule != null)
+                hHook = SetWindowsHookEx(WH_MOUSE_LL, mouseCallBack,
+                    GetModuleHandle(processModule.ModuleName), 0);
+            if (hHook == IntPtr.Zero) return false;
+            gc = GCHandle.Alloc(mouseCallBack);
+            return true;
         }
         //卸载Hook
         public bool UnLoadHook()

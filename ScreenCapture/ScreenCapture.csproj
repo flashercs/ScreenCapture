@@ -63,14 +63,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ColorBox.cs">
+    <Compile Include="UserControl\ColorBox.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="ColorBox.Designer.cs">
+    <Compile Include="UserControl\ColorBox.Designer.cs">
       <DependentUpon>ColorBox.cs</DependentUpon>
     </Compile>
-    <Compile Include="ColorBoxDesigner.cs" />
-    <Compile Include="ColorChangedEventArgs.cs" />
+    <Compile Include="UserControl\ColorBoxDesigner.cs" />
+    <Compile Include="UserControl\ColorChangedEventArgs.cs" />
     <Compile Include="FrmCapture.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -90,13 +90,13 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Include="ToolButton.cs">
+    <Compile Include="UserControl\ToolButton.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="ToolButton.Designer.cs">
+    <Compile Include="UserControl\ToolButton.Designer.cs">
       <DependentUpon>ToolButton.cs</DependentUpon>
     </Compile>
-    <Compile Include="ToolButtonDesigner.cs" />
+    <Compile Include="UserControl\ToolButtonDesigner.cs" />
     <Compile Include="Win32.cs" />
   </ItemGroup>
   <ItemGroup>

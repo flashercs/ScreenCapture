@@ -364,39 +364,40 @@ namespace ScreenCapture
                 imageProcessBox1.SetInfoPoint(MousePosition.X, MousePosition.Y);
         }
         
-        //TODO 根据鼠标位置找寻窗体平绘制边框
         private void FoundAndDrawWindowRect()
         {
-            var pt = new Win32.LPPOINT
+            var pt = new LPPOINT
             {
                 X = MousePosition.X, 
                 Y = MousePosition.Y
             };
 
             // 如果第二屏幕在左边，那么第二屏幕的坐标是负数
-            //System.Diagnostics.Debug.WriteLine($"鼠标坐标: {MousePosition.X},{MousePosition.Y}");
+            // System.Diagnostics.Debug.WriteLine($"鼠标坐标: {MousePosition.X},{MousePosition.Y}");
 
             var hWnd = ChildWindowFromPointEx(GetDesktopWindow(), pt, CWP_SKIPINVISIBL | CWP_SKIPDISABLED);
             if (hWnd == IntPtr.Zero)
             {
-                //System.Diagnostics.Debug.WriteLine($"hWnd == IntPtr.Zero: {MousePosition.X},{MousePosition.Y}");
+                // System.Diagnostics.Debug.WriteLine($"hWnd == IntPtr.Zero: {MousePosition.X},{MousePosition.Y}");
                 return;
             }
+
             var hTemp = hWnd;
             while (true)
             {
-                Win32.ScreenToClient(hTemp, out pt);
-                hTemp = Win32.ChildWindowFromPointEx(hWnd, pt, Win32.CWP_SKIPINVISIBL);
+                ScreenToClient(hTemp, out pt);
+                hTemp = ChildWindowFromPointEx(hWnd, pt, CWP_SKIPINVISIBL);
                 if (hTemp == IntPtr.Zero || hTemp == hWnd)
                     break;
                 hWnd = hTemp;
-                pt.X = MousePosition.X; pt.Y = MousePosition.Y; //坐标还原为屏幕坐标
+                pt.X = MousePosition.X; 
+                pt.Y = MousePosition.Y; // 坐标还原为屏幕坐标
             }
 
-            Win32.GetWindowRect(hWnd, out var rect);
+            GetWindowRect(hWnd, out var rect);
             imageProcessBox1.SetSelectRect(
-                new Rectangle(rect.Left- StartLocation.X, rect.Top- StartLocation.Y, rect.Right - rect.Left, rect.Bottom - rect.Top));
-            System.Diagnostics.Debug.WriteLine($"鼠标坐标: {rect.Left},{rect.Top}");
+                new Rectangle(rect.Left - StartLocation.X, rect.Top - StartLocation.Y,
+                    rect.Right - rect.Left, rect.Bottom - rect.Top));
         }
 
         #region 文本框
@@ -579,7 +580,8 @@ namespace ScreenCapture
                 imageProcessBox1.IsDrawOperationDot = false;
             }
             else if (!panel1.Visible)
-            {           //否则显示工具条
+            {          
+                //否则显示工具条
                 this.SetToolBarLocation();          //重置工具条位置
                 panel1.Visible = true;
                 m_bmpLayerCurrent = imageProcessBox1.GetResultBmp();    //获取选取图形
@@ -735,13 +737,15 @@ namespace ScreenCapture
                 return Rectangle.Empty;
             }
         }
-        
-        //设置工具条位置
+
+        /// <summary>
+        /// 设置工具条位置
+        /// </summary>
         private void SetToolBarLocation()
         {
-            int tempX = imageProcessBox1.SelectedRectangle.Left;
-            int tempY = imageProcessBox1.SelectedRectangle.Bottom + 5;
-            int tempHeight = panel2.Visible ? panel2.Height + 2 : 0;
+            var tempX = imageProcessBox1.SelectedRectangle.Right - panel1.Width;
+            var tempY = imageProcessBox1.SelectedRectangle.Bottom + 5;
+            var tempHeight = panel2.Visible ? panel2.Height + 2 : 0;
             if (tempY + panel1.Height + tempHeight >= this.Height)
                 tempY = imageProcessBox1.SelectedRectangle.Top - panel1.Height - 10 - imageProcessBox1.Font.Height;
 
@@ -752,8 +756,9 @@ namespace ScreenCapture
                 else
                     tempY = imageProcessBox1.SelectedRectangle.Top + 10 + imageProcessBox1.Font.Height;
             }
-            if (tempX + panel1.Width >= this.Width)
-                tempX = this.Width - panel1.Width - 5;
+
+            if (tempX + panel1.Width >= Width)
+                tempX = Width - panel1.Width - 5;
             panel1.Left = tempX;
             panel2.Left = tempX;
             panel1.Top = tempY;

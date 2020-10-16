@@ -296,11 +296,17 @@ namespace ScreenCapture
         protected override void OnMouseDown(MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
-            {        //根据情况是否开始绘制操作框
-                if (!this.IsDrawed || this.Cursor != Cursors.Default)
+            {
+                Debug.WriteLine($"OnMouseDown Left {!IsDrawed || Cursor != Cursors.Default}");
+                Debug.WriteLine($"OnMouseDown 鼠标 {m_ptCurrent.X},{m_ptCurrent.Y} {e.Location.X},{e.Location.Y} " +
+                                $"左上角{FrmCapture.StartLocation.X},{FrmCapture.StartLocation.Y} " +
+                                $"BaseImage {BaseImage.Width},{BaseImage.Height}");
+
+                //根据情况是否开始绘制操作框
+                if (!IsDrawed || Cursor != Cursors.Default)
                 {
-                    m_rectClip = this.DisplayRectangle;
-                    if (this.baseImage != null)
+                    m_rectClip = DisplayRectangle;
+                    if (baseImage != null)
                     {
                         if (this.isSetClip)
                         {
@@ -311,14 +317,27 @@ namespace ScreenCapture
                     Cursor.Clip = RectangleToScreen(m_rectClip);
                     isStartDraw = true;
                     m_ptOriginal = e.Location;
+                    // m_ptCurrent = e.Location;
                 }
             }
-            this.Focus();
+            Focus();
             base.OnMouseDown(e);
         }
 
+        private bool _onMouseMove = false;
+
+        /// <summary>
+        /// OnMouseMove只有在该控件已被激活或者OnMouseDown事件发生后才会触发，所以m_ptCurrent的更新是不及时的
+        /// </summary>
+        /// <param name="e"></param>
         protected override void OnMouseMove(MouseEventArgs e)
         {
+            _onMouseMove = true;
+
+            Debug.WriteLine($"OnMouseMove 鼠标 {m_ptCurrent.X},{m_ptCurrent.Y} {e.Location.X},{e.Location.Y} " +
+                            $"左上角{FrmCapture.StartLocation.X},{FrmCapture.StartLocation.Y} " +
+                            $"BaseImage {BaseImage.Width},{BaseImage.Height}");
+
             m_ptCurrent = e.Location;
             _IsMouseEnter = true;
 
@@ -438,7 +457,8 @@ namespace ScreenCapture
         protected override void OnMouseUp(MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
-            {        //如果绘制太小 则视为无效
+            {        
+                //如果绘制太小 则视为无效
                 if (this.selectedRectangle.Width >= 4 && this.selectedRectangle.Height >= 4)
                     isDrawed = true;
                 else
@@ -447,8 +467,9 @@ namespace ScreenCapture
                 isStartDraw = false;
                 m_ptTempStarPos = this.selectedRectangle.Location;
                 Cursor.Clip = new Rectangle();
-            } //else if (e.Button == MouseButtons.Right)
-            //this.ClearDraw();
+            }
+
+            _onMouseMove = false;
             this.Invalidate();
             base.OnMouseUp(e);
         }
@@ -475,14 +496,18 @@ namespace ScreenCapture
                 g.DrawImage(m_bmpDark, 0, 0);
                 g.DrawImage(BaseImage, selectedRectangle, selectedRectangle, GraphicsUnit.Pixel);
             }
-            this.DrawOperationBox(g);
+            DrawOperationBox(g);
+
             if (baseImage != null && !isDrawed && !isMoving && _IsMouseEnter && isShowInfo)
                 DrawInfo(e.Graphics);
 
             base.OnPaint(e);
         }
-        
-        //绘制操作框
+
+        /// <summary>
+        /// 绘制操作框
+        /// </summary>
+        /// <param name="g"></param>
         protected virtual void DrawOperationBox(Graphics g)
         {
             #region Draw SizeInfo
@@ -503,7 +528,7 @@ namespace ScreenCapture
 
             #endregion
 
-            if (!this.isDrawOperationDot)
+            if (!isDrawOperationDot)
             {
                 m_pen.Width = 3; m_pen.Color = this.lineColor;
                 g.DrawRectangle(m_pen, this.selectedRectangle);
@@ -519,23 +544,36 @@ namespace ScreenCapture
             m_pen.Width = 1; m_pen.Color = this.lineColor;
             g.DrawRectangle(m_pen, this.selectedRectangle);
             m_sb.Color = this.dotColor;
-            foreach (Rectangle rect in m_rectDots)
+            foreach (var rect in m_rectDots)
             {
                 g.FillRectangle(m_sb, rect);
             }
             if (this.selectedRectangle.Width <= 10 || this.selectedRectangle.Height <= 10)
                 g.DrawRectangle(m_pen, this.selectedRectangle);
         }
-        
-        //绘制图像放大信息
+
+        /// <summary>
+        /// 绘制图像放大信息
+        /// </summary>
+        /// <param name="g"></param>
         protected virtual void DrawInfo(Graphics g)
         {
+            // 鼠标坐标转为为BaseImage坐标 -> 主显示器在右侧的情况 屏幕最左上点的坐标是负数
+            var mouseX = m_ptCurrent.X;
+            var mouseY = m_ptCurrent.Y;
+
+            if (!_onMouseMove)
+            {
+                mouseX -= FrmCapture.StartLocation.X;
+                mouseY -= FrmCapture.StartLocation.Y;
+            }
+
+            Debug.WriteLine($"DrawInfo {_onMouseMove} 鼠标{m_ptCurrent.X},{m_ptCurrent.Y} {mouseX},{mouseY} " +
+                            $"左上角{FrmCapture.StartLocation.X},{FrmCapture.StartLocation.Y} " +
+                            $"BaseImage {BaseImage.Width},{BaseImage.Height}");
+
             try
             {
-                // 鼠标坐标转为为BaseImage坐标 -> 主显示器在右侧的情况 屏幕最左上点的坐标是负数
-                var mouseX = m_ptCurrent.X - FrmCapture.StartLocation.X;
-                var mouseY = m_ptCurrent.Y - FrmCapture.StartLocation.Y;
-
                 #region Calculate point
 
                 var tempX = mouseX + 20;
@@ -564,7 +602,7 @@ namespace ScreenCapture
 
                 #region Draw the magnified image
 
-                using (var bmpSrc = new Bitmap(this.magnifySize.Width, this.magnifySize.Height, PixelFormat.Format32bppArgb))
+                using (var bmpSrc = new Bitmap(magnifySize.Width, magnifySize.Height, PixelFormat.Format32bppArgb))
                 {
                     using (var gp = Graphics.FromImage(bmpSrc))
                     {
@@ -592,7 +630,7 @@ namespace ScreenCapture
             
                 Color clr = LineColor;
                 if (mouseX > 0 && mouseY > 0)
-                    clr = ((Bitmap) baseImage).GetPixel(mouseX, mouseY); // TODO 多屏幕坐标转为为BaseImage坐标
+                    clr = ((Bitmap) BaseImage).GetPixel(mouseX, mouseY); // TODO 多屏幕坐标转为为BaseImage坐标
                 g.DrawString("Size: " + (this.selectedRectangle.Width + 1) + " x "
                              + (this.selectedRectangle.Height + 1),
                     Font, m_sb, tempX + 2, tempRectBorder.Bottom + 2);
@@ -628,11 +666,16 @@ namespace ScreenCapture
             }
             catch (Exception e)
             {
-                Debug.WriteLine($"ImageProcessBox.DrawInfo {e}");
+                Debug.WriteLine($"DrawInfo  \r\n BaseImage {BaseImage.Width},{BaseImage.Height}");
             }
         }
-        
-        //放大图形
+
+        /// <summary>
+        /// 放大图形
+        /// </summary>
+        /// <param name="bmpSrc"></param>
+        /// <param name="times"></param>
+        /// <returns></returns>
         private static Bitmap MagnifyImage(Bitmap bmpSrc, int times)
         {
             Bitmap bmpNew = new Bitmap(bmpSrc.Width * times, bmpSrc.Height * times, PixelFormat.Format32bppArgb);
@@ -703,6 +746,7 @@ namespace ScreenCapture
             this.Cursor = Cursors.Default;
             this.Invalidate();
         }
+        
         /// <summary>
         /// 手动设置一个块选中区域
         /// </summary>
@@ -720,6 +764,7 @@ namespace ScreenCapture
             selectedRectangle = rect;
             Invalidate();
         }
+        
         /// <summary>
         /// 手动设置一个块选中区域
         /// </summary>
@@ -735,6 +780,7 @@ namespace ScreenCapture
             this.selectedRectangle = rectTemp;
             this.Invalidate();
         }
+        
         /// <summary>
         /// 手动设置一个块选中区域
         /// </summary>
